@@ -1,15 +1,11 @@
+/* Code for the RF carrier board at the top of the spacestack. Interfaces
+ * with the GPS and S6C. May eventually use I2C to communicate with other
+ * other boards in the stack.
+ */
 #include <TinyGPS++.h>
 #include <Arduino.h>
 #include "wiring_private.h"
-//#include <SoftwareSerial.h>
 
-void displayInfo();
-
-/*
-   This sample sketch demonstrates the normal use of a TinyGPS++ (TinyGPSPlus) object.
-   It requires the use of SoftwareSerial, and assumes that you have a
-   4800-baud serial GPS device hooked up on pins 4(rx) and 3(tx).
-*/
 #define PIN_RX_GPS 30
 #define PIN_TX_GPS 19
 #define PIN_RX_S6C 1
@@ -21,7 +17,9 @@ TinyGPSPlus gps;
 
 // The serial connection to the GPS device
 Uart SerialGPS(&sercom5, PIN_RX_GPS, PIN_TX_GPS, SERCOM_RX_PAD_2, UART_TX_PAD_0);
-Uart SerialS6C(&sercom0, PIN_RX_GPS, PIN_TX_GPS, SERCOM_RX_PAD_2, UART_TX_PAD_0);
+Uart SerialS6C(&sercom0, PIN_RX_S6C, PIN_TX_S6C, SERCOM_RX_PAD_2, UART_TX_PAD_0);
+
+void displayInfo();
 
 void SERCOM5_Handler(void) {
   SerialGPS.IrqHandler();
@@ -43,7 +41,7 @@ void setup()
   SerialGPS.begin(GPS_BAUD);
   SerialS6C.begin(9600);
   
-  delay(10000);
+  delay(2000);
   Serial.println(F("DeviceExample.ino"));
   Serial.println(F("A simple demonstration of TinyGPS++ with an attached GPS module"));
   Serial.print(F("Testing TinyGPS++ library v. ")); Serial.println(TinyGPSPlus::libraryVersion());
