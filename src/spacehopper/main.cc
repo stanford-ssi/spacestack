@@ -22,8 +22,6 @@
 // The TinyGPS++ object
 TinyGPSPlus gps;
 
-
-
 // The serial connection to the GPS device
 Uart SerialGPS(&sercom5, PIN_RX_GPS, PIN_TX_GPS, SERCOM_RX_PAD_2, UART_TX_PAD_0);
 Uart SerialS6C(&sercom0, PIN_RX_S6C, PIN_TX_S6C, SERCOM_RX_PAD_2, UART_TX_PAD_0);
@@ -33,6 +31,7 @@ const char* ack_message = "RECEIVED";
 unsigned long lastSend = 0;
 
 void displayInfo();
+void sendGPS();
 
 void SERCOM5_Handler(void) {
   SerialGPS.IrqHandler();
@@ -54,6 +53,7 @@ void setup()
   SerialGPS.begin(GPS_BAUD);
   //SerialS6C.begin(S6C_BAUD);
   S6C.begin(S6C_BAUD, &SerialS6C);
+  lastSend = millis();
   delay(2000); // wait for serial monitor to be opened
 
   Serial.print(F("TinyGPS++ library v. "));
@@ -69,7 +69,7 @@ void loop()
   // This sketch displays information every time a new sentence is correctly encoded.
 
   if (SerialGPS.available() > 0) {
-    bool time_to_send = lastSend - millis() > GPS_DATA_INTERVAL;
+    bool time_to_send = (lastSend - millis()) > GPS_DATA_INTERVAL;
     if (time_to_send && gps.encode(SerialGPS.read())) {
       sendGPS();
       displayInfo();
@@ -112,7 +112,7 @@ void sendGPS() {
     // SerialS6C.print(gps.location.lng(), 6);
     // SerialS6C.print(F(" "));
   } else {
-    GPS_message = GPS_message + "0,0 ";
+    GPS_message = GPS_message + "1,1 ";
     // SerialS6C.print(F("00.000000,000.000000 "));
   }
   if (gps.time.isValid()) {
@@ -138,15 +138,17 @@ void sendGPS() {
     // SerialS6C.print(gps.time.second());
   } else {
     // SerialS6C.print(F("00:00:00"));
-    GPS_message = GPS_message + "00:00:00";
+    GPS_message = GPS_message + "11:11:11";
   }
   GPS_message = GPS_message + "\n";
   // SerialS6C.println();
 
+  Serial.println(GPS_message);
   int buf_len = GPS_message.length() + 1;
 
   char GPS_msg_arr[buf_len];
   GPS_message.toCharArray(GPS_msg_arr, buf_len);
+  GPS_msg_arr[buf_len - 1] = '\0';
   S6C.tx(GPS_msg_arr); // problem bc GPS_msg_arr not const?
 }
 

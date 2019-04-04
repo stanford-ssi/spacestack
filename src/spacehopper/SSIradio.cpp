@@ -59,7 +59,7 @@ void SSIradio::tx(const char* buffer_in, size_t length){
 //invoked by tx()
 void SSIradio::tx(char msgtype, const char* buffer_in, size_t length){
 
-  size_t cpylen = min(length, MAX_PAYLOAD_SIZE);
+  size_t cpylen = std::min(length, MAX_PAYLOAD_SIZE);
 
   for(uint8_t i = 0; i < cpylen; i++){
     buf[i+2] = buffer_in[i];
