@@ -8,9 +8,13 @@
 
 #define PIN_RX_GPS 30
 #define PIN_TX_GPS 19
+#define GPS_BAUD 9600
+
 #define PIN_RX_S6C 1
 #define PIN_TX_S6C 4
-#define GPS_BAUD 9600
+#define S6C_BAUD 9600
+
+#define GPS_DATA_INTERVAL 500 // send data every 500 milliseconds
 
 // The TinyGPS++ object
 TinyGPSPlus gps;
@@ -39,13 +43,11 @@ void setup()
 
   Serial.begin(115200);
   SerialGPS.begin(GPS_BAUD);
-  SerialS6C.begin(9600);
-  
-  delay(2000);
-  Serial.println(F("DeviceExample.ino"));
-  Serial.println(F("A simple demonstration of TinyGPS++ with an attached GPS module"));
-  Serial.print(F("Testing TinyGPS++ library v. ")); Serial.println(TinyGPSPlus::libraryVersion());
-  Serial.println(F("by Mikal Hart"));
+  SerialS6C.begin(S6C_BAUD);
+  delay(2000); // wait for serial monitor to be opened
+
+  Serial.print(F("TinyGPS++ library v. "));
+  Serial.println(TinyGPSPlus::libraryVersion());
   Serial.println();
 }
 
@@ -53,15 +55,16 @@ void loop()
 {
   // This sketch displays information every time a new sentence is correctly encoded.
   if (SerialGPS.available() > 0) {
-    if (gps.encode(SerialGPS.read())) {
+    bool time_to_send = lastSend - millis() > GPS_DATA_INTERVAL;
+    if (time_to_send && gps.encode(SerialGPS.read())) {
+      sendGPS();
       displayInfo();
-      delay(50);
     }
   }
 
-  if (SerialS6C.available() > 0) {
-    Serial.write(SerialS6C.read());
-  }
+  // if (SerialS6C.available() > 0) {
+    // Serial.write(SerialS6C.read());
+  // }
     
 
   // if (millis() > 5000 && gps.charsProcessed() < 10)
@@ -71,8 +74,38 @@ void loop()
   // }
 }
 
-void displayInfo()
-{
+void sendGPS() {
+  /* Send GPS data to the S6C as comma-separated values.
+   *
+   * Format: lat, lon, hour, min, sec
+   */
+  if (gps.location.isValid()) {
+    SerialS6C.print(gps.location.lat(), 6);
+    SerialS6C.print(F(","));
+    SerialS6C.print(gps.location.lng(), 6);
+    SerialS6C.print(F(","));
+  } else {
+    SerialS6C.print(F"0,0,");
+  }
+  if (gps.time.isValid()) {
+    if (gps.time.hour() < 10) SerialS6C.print(F("0"));
+    SerialS6C.print(gps.time.hour());
+    SerialS6C.print(F(","));
+    if (gps.time.minute() < 10) SerialS6C.print(F("0"));
+    SerialS6C.print(gps.time.minute());
+    SerialS6C.print(F(","));
+    if (gps.time.second() < 10) SerialS6C.print(F("0"));
+    SerialS6C.print(gps.time.second());
+  } else {
+    SerialS6C.print(F"0,0,0");
+  }
+  SerialS6C.println();
+}
+
+
+void displayInfo() {
+  /* Print out GPS data to the serial monitor.
+   */
   Serial.print(F("Location: ")); 
   if (gps.location.isValid())
   {
