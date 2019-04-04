@@ -6,6 +6,8 @@
 #define SSI_RADIO
 
 #include <Arduino.h>
+#undef max
+#undef min
 #include "min.h"
 #include "RadioInterface.h"
 #include <functional>

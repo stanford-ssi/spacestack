@@ -4,6 +4,8 @@
  */
 #include <TinyGPS++.h>
 #include <Arduino.h>
+#undef min
+#undef max
 #include "wiring_private.h"
 #include "SSIradio.h"
 
