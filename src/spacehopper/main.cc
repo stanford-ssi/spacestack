@@ -7,7 +7,8 @@
 #undef min
 #undef max
 #include "wiring_private.h"
-#include "SSIradio.h"
+#include "RadioInterface.h"
+#include "min.h"
 
 #define PIN_RX_GPS 30
 #define PIN_TX_GPS 19
@@ -17,21 +18,23 @@
 #define PIN_TX_S6C 4
 #define S6C_BAUD 9600
 
-#define GPS_DATA_INTERVAL 500 // send data every 500 milliseconds
+#define GPS_DATA_INTERVAL 3600 // send data every 3.6 seconds
 
 // The TinyGPS++ object
 TinyGPSPlus gps;
+
+// min object
+struct min_context min_ctx_s6c;
 
 // The serial connection to the GPS device
 Uart SerialGPS(&sercom5, PIN_RX_GPS, PIN_TX_GPS, SERCOM_RX_PAD_2, UART_TX_PAD_0);
 Uart SerialS6C(&sercom0, PIN_RX_S6C, PIN_TX_S6C, SERCOM_RX_PAD_2, UART_TX_PAD_0);
 
-SSIradio S6C;
-const char* ack_message = "RECEIVED";
 unsigned long lastSend = 0;
 
 void displayInfo();
 void sendGPS();
+void sendCoords();
 
 void SERCOM5_Handler(void) {
   SerialGPS.IrqHandler();
@@ -46,32 +49,34 @@ void setup()
   pinPeripheral(PIN_RX_GPS, PIO_SERCOM_ALT);
   pinPeripheral(PIN_TX_GPS, PIO_SERCOM_ALT);
 
-  pinPeripheral(PIN_RX_S6C, PIO_SERCOM_ALT);
-  pinPeripheral(PIN_TX_S6C, PIO_SERCOM_ALT);
+  pinPeripheral(PIN_RX_S6C, PIO_SERCOM);
+  pinPeripheral(PIN_TX_S6C, PIO_SERCOM);
 
   Serial.begin(115200);
   SerialGPS.begin(GPS_BAUD);
-  //SerialS6C.begin(S6C_BAUD);
-  S6C.begin(S6C_BAUD, &SerialS6C);
+  SerialS6C.begin(S6C_BAUD);
+  // S6C.begin(S6C_BAUD, &SerialS6C);
   lastSend = millis();
   delay(2000); // wait for serial monitor to be opened
 
   Serial.print(F("TinyGPS++ library v. "));
   Serial.println(TinyGPSPlus::libraryVersion());
   Serial.println();
+
 }
 
 void loop()
 {
 
-  S6C.rx();
+  // S6C.rx();
 
   // This sketch displays information every time a new sentence is correctly encoded.
 
   if (SerialGPS.available() > 0) {
-    bool time_to_send = (lastSend - millis()) > GPS_DATA_INTERVAL;
-    if (time_to_send && gps.encode(SerialGPS.read())) {
-      sendGPS();
+    bool time_to_send = (millis() - lastSend) > GPS_DATA_INTERVAL;
+    if (gps.encode(SerialGPS.read()) && time_to_send) {
+      sendCoords();
+      //sendGPS();
       displayInfo();
       lastSend = millis();
     }
@@ -88,6 +93,43 @@ void loop()
   //   while(true);
   // }
 }
+
+void sendCoords() {
+  const int msg_len = sizeof(int32_t) * 3;
+  uint8_t msg[msg_len + 2];
+  msg[0] = MESSAGE_SEND;
+  msg[1] = msg_len;
+
+  ((int32_t *)(msg + 2))[0] = long(gps.location.lat()*1000000);
+  ((int32_t *)(msg + 2))[1] = long(gps.location.lng()*1000000);
+  ((int32_t *)(msg + 2))[2] = long(gps.altitude.feet());
+
+  min_send_frame(&min_ctx_s6c, 0, msg, msg[1] + 2);
+}
+
+uint16_t min_tx_space(uint8_t port)
+{
+  uint16_t n = 1;
+  if (port == 0)
+    n = SerialS6C.availableForWrite();
+  return n;
+}
+
+void min_tx_byte(uint8_t port, uint8_t byte)
+{
+  if (port == 0)
+    SerialS6C.write(&byte, 1U);
+}
+
+uint32_t min_time_ms()
+{
+  return millis();
+}
+
+void min_tx_start(uint8_t port) {}
+
+void min_tx_finished(uint8_t port) { SerialS6C.flush(); }
+
 
 void sendGPS() {
   /* Send GPS data to the S6C as comma-separated values.
@@ -149,7 +191,7 @@ void sendGPS() {
   char GPS_msg_arr[buf_len];
   GPS_message.toCharArray(GPS_msg_arr, buf_len);
   GPS_msg_arr[buf_len - 1] = '\0';
-  S6C.tx(GPS_msg_arr); // problem bc GPS_msg_arr not const?
+  // S6C.tx(GPS_msg_arr);
 }
 
 
