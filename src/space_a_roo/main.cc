@@ -3,16 +3,23 @@
 #include "wiring_private.h"
 
 #include "spacestack.h"
+#include "battery.hpp"
 
 #define I2C_SDA_1 22 // PA12
 #define I2C_SCL_1 38 // PA13
 
+#define BAT_SNS_A_PIN 15 // PB08, Analog Pins
+#define BAT_SNS_B_PIN 16 // PB09, Analog Pins
+
 TwoWire myWire(&sercom2, I2C_SDA_1, I2C_SCL_1);
+Battery battery(BAT_SNS_A_PIN, BAT_SNS_B_PIN);
 
 void requestEvent() {
   Serial.println("It beeped!");
   myWire.write("hello ");
 }
+
+
 
 void setup() {
   Serial.begin(9600);
@@ -20,10 +27,18 @@ void setup() {
   pinPeripheral(I2C_SDA_1, PIO_SERCOM);
   pinPeripheral(I2C_SCL_1, PIO_SERCOM);
   myWire.onRequest(requestEvent);
+  
 }
 
 void loop() {
   Serial.println("Boop!");
+  Battery::cell_voltage_t cells = battery.readVoltage();
+  Serial.print("cell A voltage: ");
+  Serial.println(cells.cellA, 4);
+  Serial.print("cell B voltage: ");
+  Serial.println(cells.cellB, 4);
+  Serial.print("Total voltage: ");
+  Serial.println(cells.total, 4);
   delay(500);
 }
 
