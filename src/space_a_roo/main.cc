@@ -29,6 +29,15 @@ void SERCOM0_Handler(void) {
   SerialStrato.IrqHandler();
 }
 
+void logBatInfo() {
+  Battery::cell_voltage_t cells = battery.readVoltage();
+  Serial.print("cell A voltage: ");
+  Serial.println(cells.cellA, 4);
+  Serial.print("cell B voltage: ");
+  Serial.println(cells.cellB, 4);
+  Serial.print("Total voltage: ");
+  Serial.println(cells.total, 4);
+}
 
 void setup() {
   Serial.begin(9600);
@@ -42,13 +51,7 @@ void setup() {
 
 void loop() {
   Serial.println("Boop!");
-  Battery::cell_voltage_t cells = battery.readVoltage();
-  Serial.print("cell A voltage: ");
-  Serial.println(cells.cellA, 4);
-  Serial.print("cell B voltage: ");
-  Serial.println(cells.cellB, 4);
-  Serial.print("Total voltage: ");
-  Serial.println(cells.total, 4);
+  logBatInfo();
   delay(500);
 }
 
