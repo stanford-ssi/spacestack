@@ -11,6 +11,12 @@
 #define BAT_SNS_A_PIN 15 // PB08, Analog Pins
 #define BAT_SNS_B_PIN 16 // PB09, Analog Pins
 
+#define STRAT_RX_PIN 1 // PA10
+#define STRAT_TX_PIN 4 // PA08
+
+#define STRATO_BAUD 9600
+
+Uart SerialStrato(&sercom0, STRAT_RX_PIN, STRAT_TX_PIN, SERCOM_RX_PAD_2, UART_TX_PAD_0);
 TwoWire myWire(&sercom2, I2C_SDA_1, I2C_SCL_1);
 Battery battery(BAT_SNS_A_PIN, BAT_SNS_B_PIN);
 
@@ -19,10 +25,14 @@ void requestEvent() {
   myWire.write("hello ");
 }
 
+void SERCOM0_Handler(void) {
+  SerialStrato.IrqHandler();
+}
 
 
 void setup() {
   Serial.begin(9600);
+  SerialStrato.begin(STRATO_BAUD);
   myWire.begin(spacestack_space_a_roo);
   pinPeripheral(I2C_SDA_1, PIO_SERCOM);
   pinPeripheral(I2C_SCL_1, PIO_SERCOM);
