@@ -14,15 +14,15 @@
 // TwoWire myWire(&sercom2, I2C_SDA_1, I2C_SCL_1);
 
 void setup() {
-  pinMode(I2C_SDA_2, INPUT);
-  pinMode(I2C_SCL_2, INPUT);
+  pinMode(I2C_SDA_1, INPUT);
+  pinMode(I2C_SCL_1, INPUT);
   Serial.begin(9600);
 }
 
 void loop() {
   delay(50);
-  unsigned int sda_in = digitalRead(I2C_SDA_2);
-  unsigned int scl_in = digitalRead(I2C_SCL_2);
+  unsigned int sda_in = digitalRead(I2C_SDA_1);
+  unsigned int scl_in = digitalRead(I2C_SCL_1);
   Serial.println(sda_in);
   Serial.println(scl_in);
 }

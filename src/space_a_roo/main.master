@@ -17,15 +17,21 @@
 void setup() {
   pinMode(I2C_SCL_2, OUTPUT);
   pinMode(I2C_SDA_2, OUTPUT);
+  pinMode(I2C_SCL_1, OUTPUT);
+  pinMode(I2C_SDA_1, OUTPUT);
 }
 
 void loop() {
   delay(500);
   digitalWrite(I2C_SCL_2, HIGH);
   digitalWrite(I2C_SDA_2, HIGH);
+  digitalWrite(I2C_SCL_1, HIGH);
+  digitalWrite(I2C_SDA_1, HIGH);
   delay(500);
   digitalWrite(I2C_SCL_2, LOW);
   digitalWrite(I2C_SDA_2, LOW);
+  digitalWrite(I2C_SCL_1, LOW);
+  digitalWrite(I2C_SDA_1, LOW);
 }
 
 /*
