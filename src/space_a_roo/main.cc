@@ -11,7 +11,7 @@
 #define I2C_SDA_2 11 // PA16
 #define I2C_SCL_2 13 // PA13
 
-// TwoWire myWire(&sercom2, I2C_SDA_1, I2C_SCL_1);
+TwoWire myWire(&sercom2, I2C_SDA_1, I2C_SCL_1);
 
 void setup() {
   pinMode(I2C_SDA_2, INPUT);
@@ -19,29 +19,22 @@ void setup() {
   Serial.begin(9600);
 }
 
-void loop() {
-  delay(50);
-  unsigned int sda_in = digitalRead(I2C_SDA_2);
-  unsigned int scl_in = digitalRead(I2C_SCL_2);
-  Serial.println(sda_in);
-  Serial.println(scl_in);
-}
-
-
-
-
-/*
-void requestEvent() {
+// void requestEvent() {
+  // Serial.println("It beeped!");
+// }
+void receiveEvent(int num_bytes) {
   Serial.println("It beeped!");
-  myWire.write("hello ");
 }
 
 void setup() {
   Serial.begin(9600);
+  delay(3000);
   myWire.begin(spacestack_space_a_roo);
+  // myWire.begin();
   pinPeripheral(I2C_SDA_1, PIO_SERCOM);
   pinPeripheral(I2C_SCL_1, PIO_SERCOM);
-  myWire.onRequest(requestEvent);
+  // myWire.onRequest(requestEvent);
+  myWire.onReceive(receiveEvent);
 }
 
 void loop() {
@@ -50,9 +43,7 @@ void loop() {
 }
 
 extern "C" {
-  void SERCOM2_Handler(void);
-  void SERCOM2_HANDLER(void) {
+  void SERCOM2_Handler(void) {
     myWire.onService();
   }
 }
-*/
