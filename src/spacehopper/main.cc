@@ -1,27 +1,40 @@
+/* Code for the RF carrier board at the top of the spacestack. Interfaces
+ * with the GPS and S6C. May eventually use I2C to communicate with other
+ * other boards in the stack.
+ */
 #include <TinyGPS++.h>
 #include <Arduino.h>
+#undef min
+#undef max
 #include "wiring_private.h"
-//#include <SoftwareSerial.h>
+#include "RadioInterface.h"
+#include "min.h"
 
-void displayInfo();
-
-/*
-   This sample sketch demonstrates the normal use of a TinyGPS++ (TinyGPSPlus) object.
-   It requires the use of SoftwareSerial, and assumes that you have a
-   4800-baud serial GPS device hooked up on pins 4(rx) and 3(tx).
-*/
 #define PIN_RX_GPS 30
 #define PIN_TX_GPS 19
+#define GPS_BAUD 9600
+
 #define PIN_RX_S6C 1
 #define PIN_TX_S6C 4
-#define GPS_BAUD 9600
+#define S6C_BAUD 9600
+
+#define GPS_DATA_INTERVAL 3600 // send data every 3.6 seconds
 
 // The TinyGPS++ object
 TinyGPSPlus gps;
 
+// min object
+struct min_context min_ctx_s6c;
+
 // The serial connection to the GPS device
 Uart SerialGPS(&sercom5, PIN_RX_GPS, PIN_TX_GPS, SERCOM_RX_PAD_2, UART_TX_PAD_0);
-Uart SerialS6C(&sercom0, PIN_RX_GPS, PIN_TX_GPS, SERCOM_RX_PAD_2, UART_TX_PAD_0);
+Uart SerialS6C(&sercom0, PIN_RX_S6C, PIN_TX_S6C, SERCOM_RX_PAD_2, UART_TX_PAD_0);
+
+unsigned long lastSend = 0;
+
+void displayInfo();
+void sendGPS();
+void sendCoords();
 
 void SERCOM5_Handler(void) {
   SerialGPS.IrqHandler();
@@ -36,34 +49,42 @@ void setup()
   pinPeripheral(PIN_RX_GPS, PIO_SERCOM_ALT);
   pinPeripheral(PIN_TX_GPS, PIO_SERCOM_ALT);
 
-  pinPeripheral(PIN_RX_S6C, PIO_SERCOM_ALT);
-  pinPeripheral(PIN_TX_S6C, PIO_SERCOM_ALT);
+  pinPeripheral(PIN_RX_S6C, PIO_SERCOM);
+  pinPeripheral(PIN_TX_S6C, PIO_SERCOM);
 
   Serial.begin(115200);
   SerialGPS.begin(GPS_BAUD);
-  SerialS6C.begin(9600);
-  
-  delay(10000);
-  Serial.println(F("DeviceExample.ino"));
-  Serial.println(F("A simple demonstration of TinyGPS++ with an attached GPS module"));
-  Serial.print(F("Testing TinyGPS++ library v. ")); Serial.println(TinyGPSPlus::libraryVersion());
-  Serial.println(F("by Mikal Hart"));
+  SerialS6C.begin(S6C_BAUD);
+  // S6C.begin(S6C_BAUD, &SerialS6C);
+  lastSend = millis();
+  delay(2000); // wait for serial monitor to be opened
+
+  Serial.print(F("TinyGPS++ library v. "));
+  Serial.println(TinyGPSPlus::libraryVersion());
   Serial.println();
+
 }
 
 void loop()
 {
+
+  // S6C.rx();
+
   // This sketch displays information every time a new sentence is correctly encoded.
+
   if (SerialGPS.available() > 0) {
-    if (gps.encode(SerialGPS.read())) {
+    bool time_to_send = (millis() - lastSend) > GPS_DATA_INTERVAL;
+    if (gps.encode(SerialGPS.read()) && time_to_send) {
+      sendCoords();
+      //sendGPS();
       displayInfo();
-      delay(50);
+      lastSend = millis();
     }
   }
 
-  if (SerialS6C.available() > 0) {
-    Serial.write(SerialS6C.read());
-  }
+  // if (SerialS6C.available() > 0) {
+    // Serial.write(SerialS6C.read());
+  // }
     
 
   // if (millis() > 5000 && gps.charsProcessed() < 10)
@@ -73,8 +94,114 @@ void loop()
   // }
 }
 
-void displayInfo()
+void sendCoords() {
+  char message_id = 0x3; // 0b11
+  const int msg_len = sizeof(int32_t) * 3 + sizeof(uint8_t);
+  uint8_t msg[msg_len + 2];
+  msg[0] = MESSAGE_SEND;
+  msg[1] = msg_len;
+  msg[2] = message_id;
+
+  ((int32_t *)(msg + 3))[0] = long(gps.location.lat()*1000000);
+  ((int32_t *)(msg + 3))[1] = long(gps.location.lng()*1000000);
+  ((int32_t *)(msg + 3))[2] = long(gps.altitude.feet());
+
+  min_send_frame(&min_ctx_s6c, 0, msg, msg[1] + 3);
+}
+
+uint16_t min_tx_space(uint8_t port)
 {
+  uint16_t n = 1;
+  if (port == 0)
+    n = SerialS6C.availableForWrite();
+  return n;
+}
+
+void min_tx_byte(uint8_t port, uint8_t byte)
+{
+  if (port == 0)
+    SerialS6C.write(&byte, 1U);
+}
+
+uint32_t min_time_ms()
+{
+  return millis();
+}
+
+void min_tx_start(uint8_t port) {}
+
+void min_tx_finished(uint8_t port) { SerialS6C.flush(); }
+
+
+void sendGPS() {
+  /* Send GPS data to the S6C as comma-separated values.
+   * lat - 9 + "," = 10
+   * lon - 11 + " " = 12
+   * hour - 2 + ":" = 3
+   * min - 2 + ":" = 3
+   * sec - 2
+   * \n - 1 + "\0" = 2
+   * Format: lat, lon, hour, min, sec
+   */
+
+  String GPS_message = "";
+
+  if (gps.location.isValid()) {
+    GPS_message = GPS_message + String(gps.location.lat(), 6);
+    GPS_message = GPS_message + ",";
+    GPS_message = GPS_message + String(gps.location.lng(), 6);
+    GPS_message = GPS_message + " ";
+    // SerialS6C.print(gps.location.lat(), 6);
+    // SerialS6C.print(F(","));
+    // SerialS6C.print(gps.location.lng(), 6);
+    // SerialS6C.print(F(" "));
+  } else {
+    GPS_message = GPS_message + "1,1 ";
+    // SerialS6C.print(F("00.000000,000.000000 "));
+  }
+  if (gps.time.isValid()) {
+    if (gps.time.hour() < 10) {
+      GPS_message = GPS_message + "0";
+      // SerialS6C.print(F("0"));
+    }
+    GPS_message = GPS_message + String(gps.time.hour()) + ":";
+      // SerialS6C.print(gps.time.hour());
+      // SerialS6C.print(F(":"));
+    if (gps.time.minute() < 10) {
+      GPS_message = GPS_message + "0";
+      // SerialS6C.print(F("0"));
+    }
+    GPS_message = GPS_message + String(gps.time.minute()) + ":";
+    // SerialS6C.print(gps.time.minute());
+    // SerialS6C.print(F(":"));
+    if (gps.time.second() < 10) {
+      GPS_message = GPS_message + "0";
+      // SerialS6C.print(F("0"));
+    }
+    GPS_message = GPS_message + String(gps.time.second());
+    // SerialS6C.print(gps.time.second());
+  } else {
+    // SerialS6C.print(F("00:00:00"));
+    GPS_message = GPS_message + "11:11:11";
+  }
+  GPS_message = GPS_message + "\n";
+  // SerialS6C.println();
+
+  Serial.println(GPS_message);
+  int buf_len = GPS_message.length() + 1;
+
+  char GPS_msg_arr[buf_len];
+  GPS_message.toCharArray(GPS_msg_arr, buf_len);
+  GPS_msg_arr[buf_len - 1] = '\0';
+  // S6C.tx(GPS_msg_arr);
+}
+
+
+void displayInfo() {
+  /* Print out GPS data to the serial monitor.
+   */
+
+  // Format -- Location: lat,lng Date/Time: mo/day/yr hr:min:sec.centisec \n
   Serial.print(F("Location: ")); 
   if (gps.location.isValid())
   {
@@ -87,7 +214,7 @@ void displayInfo()
     Serial.print(F("INVALID"));
   }
 
-  Serial.print(F("  Date/Time: "));
+  Serial.print(F(" Date/Time: "));
   if (gps.date.isValid())
   {
     Serial.print(gps.date.month());
