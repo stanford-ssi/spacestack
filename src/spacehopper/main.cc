@@ -95,16 +95,18 @@ void loop()
 }
 
 void sendCoords() {
-  const int msg_len = sizeof(int32_t) * 3;
+  char message_id = 0x3; // 0b11
+  const int msg_len = sizeof(int32_t) * 3 + sizeof(uint8_t);
   uint8_t msg[msg_len + 2];
   msg[0] = MESSAGE_SEND;
   msg[1] = msg_len;
+  msg[2] = message_id;
 
-  ((int32_t *)(msg + 2))[0] = long(gps.location.lat()*1000000);
-  ((int32_t *)(msg + 2))[1] = long(gps.location.lng()*1000000);
-  ((int32_t *)(msg + 2))[2] = long(gps.altitude.feet());
+  ((int32_t *)(msg + 3))[0] = long(gps.location.lat()*1000000);
+  ((int32_t *)(msg + 3))[1] = long(gps.location.lng()*1000000);
+  ((int32_t *)(msg + 3))[2] = long(gps.altitude.feet());
 
-  min_send_frame(&min_ctx_s6c, 0, msg, msg[1] + 2);
+  min_send_frame(&min_ctx_s6c, 0, msg, msg[1] + 3);
 }
 
 uint16_t min_tx_space(uint8_t port)
