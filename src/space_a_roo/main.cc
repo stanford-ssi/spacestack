@@ -13,11 +13,11 @@
 
 TwoWire myWire(&sercom2, I2C_SDA_1, I2C_SCL_1);
 
-void setup() {
-  pinMode(I2C_SDA_2, INPUT);
-  pinMode(I2C_SCL_2, INPUT);
-  Serial.begin(9600);
-}
+// void setup() {
+//   pinMode(I2C_SDA_2, INPUT);
+//   pinMode(I2C_SCL_2, INPUT);
+//   Serial.begin(9600);
+// }
 
 // void requestEvent() {
   // Serial.println("It beeped!");

@@ -4,6 +4,7 @@
 #include "wiring_private.h"
 #include "spacestack.h"
 #include <TinyGPS++.h>
+#include <Wire.h>
 
 #define I2C_SDA_1 22 // PA12
 #define I2C_SCL_1 38 // PA13
